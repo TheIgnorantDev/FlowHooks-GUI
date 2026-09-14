@@ -45,6 +45,9 @@
     <ClCompile Include="FHGUI\Elements\Controls.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="FHGUI\Elements\Inputs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MainWindow\MainWindow.hpp">
@@ -69,6 +72,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FHGUI\Datatypes.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FHGUI\Theme.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FHGUI\Input.hpp">

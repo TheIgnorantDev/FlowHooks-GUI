@@ -5,6 +5,7 @@
 //-----------------------------------------------------------------------------
 
 #include <cmath>
+#include <algorithm>
 #include <tchar.h>
 #include <DirectXMath.h>
 
@@ -262,7 +263,7 @@ HRESULT CD3DFont::RestoreDeviceObjects()
     HRESULT hr;
 
     // Create vertex buffer for the letters
-    int vertexSize = max(sizeof(FONT2DVERTEX), sizeof(FONT3DVERTEX));
+    int vertexSize = static_cast<int>((std::max)(sizeof(FONT2DVERTEX), sizeof(FONT3DVERTEX)));
     if (FAILED(hr = this->pd3dDevice->CreateVertexBuffer(MAX_NUM_VERTICES * vertexSize,
         D3DUSAGE_WRITEONLY | D3DUSAGE_DYNAMIC, 0,
         D3DPOOL_DEFAULT, &this->pVB, nullptr))) {

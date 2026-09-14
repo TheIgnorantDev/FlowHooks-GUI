@@ -1,28 +1,40 @@
 #pragma once
 #include <Windows.h>
+#include <string>
+#include <vector>
 
 #include "Datatypes.hpp"
 #include "../Singleton.hpp"
 
 namespace FHGUI
 {
-	constexpr int MAX_KEYS = 255;
+	class Control;
+	constexpr int MAX_KEYS = 256;
 
 	class Input : public Singleton<Input>
 	{
+		friend struct InputTestDriver;
 	public:
 		void Init(HWND hWnd);
 		void Update();
 		bool OnWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+		void SetFocus(Control* control);
+		Control* FocusedControl() const { return FocusedControl_; }
+		bool HasFocus() const { return GetForegroundWindow() == hWnd_; }
+		bool KeyDown(int key) const { return key > 0 && key < MAX_KEYS && PressedKeys_[key]; }
+		const std::wstring& Characters() const { return Characters_; }
+		const std::vector<int>& EditingKeys() const { return EditingKeys_; }
+		std::string ClipboardText() const;
+		void CopyText(const std::string& text) const;
 
 		bool KeyPressed(int Key)
 		{
-			return PressedKeys_[Key] && !PrevPressedKeys_[Key];
+			return Key > 0 && Key < MAX_KEYS && PressedKeys_[Key] && !PrevPressedKeys_[Key];
 		}
 
 		bool KeyHeld(int Key)
 		{
-			return PrevPressedKeys_[Key] && PressedKeys_[Key];
+			return Key > 0 && Key < MAX_KEYS && PrevPressedKeys_[Key] && PressedKeys_[Key];
 		}
 
 		Point CursorPos()
@@ -42,6 +54,9 @@ namespace FHGUI
 
 	private:
 		HWND hWnd_{ nullptr };
+		Control* FocusedControl_{ nullptr };
+		std::wstring PendingCharacters_, Characters_;
+		std::vector<int> PendingEditingKeys_, EditingKeys_;
 		Point MousePos_{ 0, 0 };
 		bool PressedKeys_[MAX_KEYS]{ false }, PrevPressedKeys_[MAX_KEYS]{ false };
 	};
