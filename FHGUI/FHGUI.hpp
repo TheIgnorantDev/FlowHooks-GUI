@@ -17,13 +17,16 @@ namespace FHGUI
 
 		void RegisterWindow(Window* pWindow)
 		{
+			if (!pWindow) return;
+			if (!ActiveWindow_) ActiveWindow_ = pWindow;
 			Windows_.emplace_back(pWindow);
 		}
 
 	private:
 		bool IsOpen_{ true };
-		float CurrentTime_{ -1.0f };
+		float CurrentTime_{ 0.0f };
 		std::vector<Window*> Windows_{};
+		Window* ActiveWindow_{ nullptr };
 		Window* DraggingWindow_{ nullptr };
 		int DragOffsetX_{ 0 };
 		int DragOffsetY_{ 0 };

@@ -3,15 +3,23 @@
 #include "FHGUI.hpp"
 #include "Input.hpp"
 #include "Elements/Window.hpp"
+#include "Elements/Controls.hpp"
 
 namespace FHGUI
 {
 	void Instance::Update()
 	{
 		Input::Get().Update();
+		auto& input = Input::Get();
+		Control* focused = input.FocusedControl();
+		const bool keyboardCaptured = focused && focused->CapturesKeyboard();
+		// Evaluate bindings on all tabs, even while the menu is hidden.
+		for (auto window : Windows_) if (window) window->UpdateBindings(keyboardCaptured);
 
-		if (Input::Get().KeyPressed(VK_INSERT)) {
+		if (!keyboardCaptured && Input::Get().KeyPressed(VK_INSERT)) {
 			IsOpen_ = !IsOpen_;
+			input.SetFocus(nullptr);
+			DraggingWindow_ = nullptr;
 		}
 
 		if (!IsOpen_) return;
@@ -19,7 +27,7 @@ namespace FHGUI
 
 		CurrentTime_ += 0.01f;
 
-		if (DraggingWindow_ && !Input::Get().KeyHeld(VK_LBUTTON)) {
+		if (DraggingWindow_ && !Input::Get().KeyDown(VK_LBUTTON)) {
 			DraggingWindow_ = nullptr;
 		}
 
@@ -32,37 +40,37 @@ namespace FHGUI
 
 		bool LeftClick = Input::Get().KeyPressed(VK_LBUTTON);
 
-		for (std::size_t i = 0; i < Windows_.size(); ++i) {
-			Window* pWindow = Windows_[i];
-			if (!pWindow) continue;
+		// Reverse order matches rendering, including windows with equal timestamps.
+		Window* target = nullptr;
+		for (auto it = Windows_.rbegin(); it != Windows_.rend(); ++it)
+			if (*it && (*it)->HitTest()) { target = *it; break; }
 
-			bool ShouldHandleInput = true;
+		Window* focusedWindow = nullptr;
+		for (auto window : Windows_)
+			if (window && focused && focused->BelongsTo(window)) focusedWindow = window;
 
-			for (std::size_t j = 0; j < Windows_.size(); ++j) {
-				Window* pOther = Windows_[j];
-				if (!pOther || pWindow == pOther) continue;
-
-				if (pOther->LastInputTime_ > pWindow->LastInputTime_) {
-					if (Input::Get().MouseInArea(pOther->Area())) {
-						ShouldHandleInput = false;
-						break;
-					}
+		// Mouse buttons are valid bind candidates; do not dispatch their capture click.
+		if (focusedWindow && keyboardCaptured && dynamic_cast<KeyBind*>(focused)) {
+			focusedWindow->Update();
+			return;
+		}
+		if (LeftClick) {
+			if (target != focusedWindow) input.SetFocus(nullptr);
+			if (target) {
+				ActiveWindow_ = target;
+				target->LastInputTime_ = CurrentTime_;
+				if (input.MouseInArea(target->DragArea())) {
+					input.SetFocus(nullptr);
+					DragOffsetX_ = CursorPos.x - target->PosX_;
+					DragOffsetY_ = CursorPos.y - target->PosY_;
+					DraggingWindow_ = target;
+					return;
 				}
+				target->Update();
 			}
-
-			if (!ShouldHandleInput)
-				continue;
-
-			if (LeftClick && Input::Get().MouseInArea(pWindow->DragArea())) {
-				pWindow->LastInputTime_ = CurrentTime_;
-
-				DragOffsetX_ = CursorPos.x - pWindow->PosX_;
-				DragOffsetY_ = CursorPos.y - pWindow->PosY_;
-
-				DraggingWindow_ = pWindow;
-			}
-
-			pWindow->Update();
+		} else if (!DraggingWindow_) {
+			if (focusedWindow) focusedWindow->Update();
+			else if (ActiveWindow_) ActiveWindow_->Update();
 		}
 	}
 
@@ -71,7 +79,7 @@ namespace FHGUI
 		if (!IsOpen_) return;
 		if (Windows_.empty()) return;
 
-		std::sort(Windows_.begin(), Windows_.end(), [](const Window* a, const Window* b) {
+		std::stable_sort(Windows_.begin(), Windows_.end(), [](const Window* a, const Window* b) {
 			return a->LastInputTime_ < b->LastInputTime_;
 			});
 

@@ -7,7 +7,7 @@
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
-	if (!MainWindow::Get().Init(L"FlowHooks", L"FlowHooks GUI Showcase", 1280, 600)) {
+	if (!MainWindow::Get().Init(L"FlowHooks", L"FlowHooks GUI Showcase", 1280, 720)) {
 		MessageBoxW(nullptr, L"Failed to create Window!", L"FHGUI", MB_OK | MB_ICONERROR);
 		return 1;
 	}

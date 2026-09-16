@@ -20,6 +20,7 @@ namespace FHGUI
 
 		void Render(const Rect& Area, bool Selected, bool FirstTab);
 		void Update();
+		void UpdateBindings(bool suppressed);
 
 		int GetTitleWidth()
 		{
@@ -55,6 +56,8 @@ namespace FHGUI
 
 		void Render();
 		void Update();
+		void UpdateBindings(bool suppressed);
+		bool HitTest();
 
 		void SetTitle(const std::string& strTitle)
 		{

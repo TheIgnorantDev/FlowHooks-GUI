@@ -2,6 +2,7 @@
 #include "Window.hpp"
 
 #include "../Input.hpp"
+#include "../Theme.hpp"
 
 #include "../../Render/D3DFont.hpp"
 #include "../../Render/Render.hpp"
@@ -49,6 +50,11 @@ namespace FHGUI
 	{
 		if (Tabs_.empty())
 			return;
+		Control* focused = Input::Get().FocusedControl();
+		if (focused && focused->BelongsTo(this) && dynamic_cast<KeyBind*>(focused) && focused->CapturesKeyboard()) {
+			if (SelectedTab_) SelectedTab_->Update();
+			return;
+		}
 
 		if (Input::Get().KeyPressed(VK_LBUTTON)) {
 			const Rect& Area = ClientArea();
@@ -63,6 +69,7 @@ namespace FHGUI
 
 				Rect TabArea = { Area.x + OffsetX, Area.y, TabWidth, TAB_HEIGHT };
 				if (Input::Get().MouseInArea(TabArea)) {
+					Input::Get().SetFocus(nullptr);
 					SelectedTab_ = pTab;
 				}
 
@@ -73,6 +80,22 @@ namespace FHGUI
 		if (SelectedTab_) {
 			SelectedTab_->Update();
 		}
+	}
+
+	bool Window::HitTest()
+	{
+		Control* focused = Input::Get().FocusedControl();
+		return Input::Get().MouseInArea(Area()) || (focused && focused->BelongsTo(this) && focused->IsPopupOpen() && Input::Get().MouseInArea(focused->InputArea()));
+	}
+
+	void Window::UpdateBindings(bool suppressed)
+	{
+		for (auto tab : Tabs_) if (tab) tab->UpdateBindings(suppressed);
+	}
+
+	void Tab::UpdateBindings(bool suppressed)
+	{
+		for (auto control : Controls_) if (control) control->UpdateBinding(suppressed);
 	}
 
 	Tab::Tab(const std::string& strTitle) : Title_{ strTitle }
@@ -96,7 +119,7 @@ namespace FHGUI
 			int Width = FirstTab ? (Area.w - 1) : (Area.w - 2);
 
 			Render::FilledRect(PosX, Area.y + 1, Width, Area.h, { 46, 46, 46, 255 });
-			Render::FilledRect(PosX, Area.y + 1, Width, 2, { 255, 146, 0, 255 });
+			Render::FilledRect(PosX, Area.y + 1, Width, 2, Theme::Accent);
 		}
 		else {
 			Render::FilledRect(Area.x, Area.y, Area.w, Area.h, { 24, 24, 24, 255 });
@@ -109,12 +132,15 @@ namespace FHGUI
 		if (!Selected || Controls_.empty())
 			return;
 
+		Control* focused = Input::Get().FocusedControl();
 		for (size_t i = 0; i < Controls_.size(); ++i) {
 			Control* pControl = Controls_[i];
-			if (pControl) {
+			if (pControl && !(pControl == focused && pControl->IsPopupOpen())) {
 				pControl->Render();
 			}
 		}
+		if (focused && focused->BelongsTo(this) && focused->IsPopupOpen()) focused->Render();
+		if (focused && focused->IsPopupOpen()) return;
 
 		for (size_t i = 0; i < Controls_.size(); ++i) {
 			Control* pControl = Controls_[i];
@@ -129,20 +155,52 @@ namespace FHGUI
 		if (Controls_.empty())
 			return;
 
+		auto& input = Input::Get();
+		Control* focused = input.FocusedControl();
+		if (input.KeyPressed(VK_TAB) && !(focused && focused->CapturesKeyboard() && focused->Type_ == ControlTypes::KEYBIND)) {
+			// Commit any characters received in the same frame before moving focus.
+			if (focused && focused->BelongsTo(this)) focused->Update();
+			std::vector<Control*> focusable;
+			int current = -1;
+			for (auto control : Controls_) {
+				if (!control || !control->Focusable()) continue;
+				if (control == focused) current = static_cast<int>(focusable.size());
+				focusable.push_back(control);
+			}
+			if (!focusable.empty()) {
+				int count = static_cast<int>(focusable.size());
+				int next = current < 0 ? (input.KeyDown(VK_SHIFT) ? count - 1 : 0) : (current + (input.KeyDown(VK_SHIFT) ? count - 1 : 1)) % count;
+				input.SetFocus(focusable[next]);
+			}
+			return;
+		}
+
+		// A listening key bind owns mouse buttons as well as keyboard keys.
+		const bool capturingBind = focused && focused->BelongsTo(this) && focused->Type_ == ControlTypes::KEYBIND && focused->CapturesKeyboard();
 		for (size_t i = 0; i < Controls_.size(); ++i) {
 			Control* pControl = Controls_[i];
 			if (pControl) {
 				pControl->Update();
 			}
 		}
+		if (capturingBind) return;
 
 		if (Input::Get().KeyPressed(VK_LBUTTON)) {
-			for (size_t i = 0; i < Controls_.size(); ++i) {
-				Control* pControl = Controls_[i];
-				if (pControl && Input::Get().MouseInArea(pControl->InputArea())) {
+			focused = input.FocusedControl();
+			if (focused && focused->BelongsTo(this) && focused->IsPopupOpen()) {
+				if (input.MouseInArea(focused->InputArea())) focused->OnClick();
+				else input.SetFocus(nullptr);
+				return;
+			}
+			for (auto it = Controls_.rbegin(); it != Controls_.rend(); ++it) {
+				Control* pControl = *it;
+				if (pControl && pControl->Focusable() && Input::Get().MouseInArea(pControl->InputArea())) {
+					input.SetFocus(pControl);
 					pControl->OnClick();
+					return;
 				}
 			}
+			input.SetFocus(nullptr);
 		}
 	}
 
